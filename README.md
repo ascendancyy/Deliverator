@@ -6,7 +6,7 @@
   <h1>Deliverator</h1>
 </div>
 
-Another item manager for Destiny built with [Vue.js](https://vuejs.org/)
+Another item manager for Destiny built with [Vue.js](https://vuejs.org/)  
 This app utilizes newer features and is not supported on older browsers.
 
 
