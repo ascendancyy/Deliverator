@@ -1,0 +1,14 @@
+body,
+button {
+  font-weight: $base-font-weight;
+  font-family: Cabin, sans-serif;
+  line-height: $base-line-height;
+  word-spacing: 0;
+  letter-spacing: 0;
+
+  @include classless('.main-font-loaded') {
+    font-family: sans-serif;
+    word-spacing: -0.2px;
+    letter-spacing: -0.35px;
+  }
+}
