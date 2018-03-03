@@ -72,13 +72,6 @@ function bucketColumn(index, items, filter) {
       (filter && filter.includes(item.bucket.hash)) ||
       hidden
     ) {
-      if (process.env.NODE_ENV !== 'production') {
-        if (!item.bucket.enabled) {
-          console.log('Disabled Bucket:', item);
-        } else if (item.bucket.redacted) {
-          console.log('Redacted Bucket:', item);
-        }
-      }
       return;
     }
 
