@@ -1,8 +1,43 @@
+import _ from 'lodash';
+
 import Paths from 'B.Net/Paths';
 import Service from 'B.Net/Service';
 import Definitions from 'B.Net/Definitions';
 
 import Storage from 'src/Storage';
+
+import wasmPath from 'sql.js/js/sql-optimized-wasm-raw.wasm';
+
+const fallbackSQL = _.once((err) => {
+  console.warn(err);
+  return new Promise(async (resolve) => {
+    const ctor = import(/* webpackChunkName: "sql" */ 'sql.js');
+    (await ctor)()
+      .then(({ SQL }) => {
+        resolve(SQL);
+        window.SQL = null;
+      });
+  });
+});
+
+const importSQL = _.once(() => {
+  if (typeof WebAssembly === 'object') {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const ctor = import(/* webpackChunkName: "sql.wasm" */ 'sql.js/js/sql-optimized-wasm');
+        (await ctor)({ locateFile: () => wasmPath })
+          .then(({ SQL }) => {
+            resolve(SQL);
+            window.SQL = null;
+          });
+      } catch (e) {
+        reject(e);
+      }
+    }).catch(fallbackSQL);
+  }
+
+  return fallbackSQL(new Error('WebAssembly not available'));
+});
 
 // ---------------------------------------
 let database = null;
@@ -56,7 +91,7 @@ function readBlob(blob) {
       }
 
       const array = new Uint8Array(result);
-      const SQL = await import(/* webpackChunkName: "sql" */ 'sql.js');
+      const SQL = await importSQL();
       resolve(new SQL.Database(array));
     };
 
@@ -118,7 +153,7 @@ async function readZip(zip, location) {
   const array = await zip.file(/world/)[0].async('uint8array');
 
   storeManifest(new Blob([array], { type: 'application/sql' }), location);
-  const SQL = await import(/* webpackChunkName: "sql" */ 'sql.js');
+  const SQL = await importSQL();
   return new SQL.Database(array);
 }
 

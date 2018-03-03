@@ -89,6 +89,12 @@ const base = {
   module: {
     rules: [
       {
+        test: /\.(png|jpg|gif|wasm)$/,
+        use: [{
+          loader: 'file-loader',
+          options: { name: '[name].[ext]?[hash]' },
+        }],
+      }, {
         test: /\.vue$/,
         use: [{
           loader: 'vue-loader',
@@ -142,7 +148,7 @@ const base = {
         }),
       }, {
         test: /\.js$/,
-        exclude: /node_modules/,
+        exclude: /(node_modules|sql\.js)/,
         use: [
           'babel-loader',
           {
@@ -173,12 +179,6 @@ const base = {
             },
           },
         ],
-      }, {
-        test: /\.(png|jpg|gif)$/,
-        use: [{
-          loader: 'file-loader',
-          options: { name: '[name].[ext]?[hash]' },
-        }],
       },
     ],
   },
