@@ -188,7 +188,7 @@ export default {
       const { item } = this;
       if (
         !item ||
-        (item && item.nonTransferrable && !item.canEqui)
+        (item && item.nonTransferrable && !item.canEquip)
       ) {
         return [];
       }
