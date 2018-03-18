@@ -72,7 +72,11 @@ export default {
     };
   },
   computed: {
-    ...mapState('activeMembership', ['definitions']),
+    ...mapState('activeMembership', [
+      'definitions',
+      'inspectedItemId',
+      'selectedItemId',
+    ]),
     itemIconSrc() {
       if (!this.definition) {
         return '';
@@ -150,10 +154,7 @@ export default {
         value: '',
       };
     },
-    selected() {
-      // TODO: Finish.
-      return false;
-    },
+    selected() { return this.selectedItemId === this.instance.id; },
   },
   watch: {
     async definitions(newDefinitions) {
@@ -231,23 +232,23 @@ export default {
     }
   },
   methods: {
-    click(event) {
+    click() {
       if (this.$itemCard) {
         if (!this.selected) {
-          this.$itemCard.showSelected({ item: this.item, event });
+          this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', this.instance.id);
         } else {
-          this.$itemCard.hide({ forceUnpin: false });
+          this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', -1);
         }
       }
     },
-    mouseMove(event) {
-      if (!this.selected && this.$itemCard) {
-        this.$itemCard.showHover({ item: this.item, event });
+    mouseMove() {
+      if (this.$itemCard && this.inspectedItemId !== this.instance.id) {
+        this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', this.instance.id);
       }
     },
     mouseOut() {
-      if (!this.selected && this.$itemCard) {
-        this.$itemCard.hide({ forceUnpin: false });
+      if (this.$itemCard) {
+        this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', -1);
       }
     },
 

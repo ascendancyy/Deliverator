@@ -27,6 +27,8 @@ const {
   SET_ITEM_INSTANCES,
   SET_CHARACTER_ITEM_IDS,
   SET_ACCOUNT_ITEM_IDS,
+  SET_INSPECTED_ITEM_ID,
+  SET_SELECTED_ITEM_ID,
   RESET,
 
   SET_SEARCH_QUERY,
@@ -92,6 +94,8 @@ const state = {
   accountItemIds: [],
   characterItemIds: {},
   itemInstances: {},
+  inspectedItemId: -1,
+  selectedItemId: -1,
 
   searchQuery: '',
   searchActive: false,
@@ -204,6 +208,12 @@ const mutations = {
   },
   [SET_ACCOUNT_ITEM_IDS]: function setAccountItemIds(state, itemIds) {
     state.accountItemIds = itemIds;
+  },
+  [SET_INSPECTED_ITEM_ID]: function setInspectedItemId(state, id) {
+    state.inspectedItemId = id;
+  },
+  [SET_SELECTED_ITEM_ID]: function setSelectedItemId(state, id) {
+    state.selectedItemId = id;
   },
   [RESET]: function reset() {
     state.id = null;
