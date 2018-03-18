@@ -326,7 +326,7 @@ const actions = {
     } = payload;
 
     const itemInstances = {};
-    const add = async (item) => {
+    const add = async (item, owner) => {
       const id = item.itemInstanceId || _.uniqueId('item_');
       const { data: { [item.itemInstanceId]: instance = {} } } = itemComponents.instances;
 
@@ -353,6 +353,7 @@ const actions = {
         ...item,
         ...instance,
         id,
+        owner,
         bucket: bucketDef,
         currentBucket: await definitions.InventoryBucket[item.bucketHash],
       };
@@ -365,12 +366,14 @@ const actions = {
       const bucket = await definitions.InventoryBucket[itemDef.inventory.bucketTypeHash];
       const currentBucket = await definitions.InventoryBucket[item.bucketHash];
       let key = 0;
+      let owner = Identifiers.VAULT;
       if (bucket.scope === 1) {
         if (bucket.hash === currentBucket.hash && bucket.location === 0) {
           key = 1;
+          owner = 'account';
         }
       }
-      (await acc)[key].push(add(item));
+      (await acc)[key].push(add(item, owner));
       return acc;
     }, Promise.resolve([[], []]));
 
@@ -385,7 +388,10 @@ const actions = {
       const { [owner]: { items: items1 } } = characterInventories;
       const { [owner]: { items: items2 } } = characterEquipment;
 
-      const ids = Promise.all([...items1.map(add), ...items2.map(add)]);
+      const ids = Promise.all([
+        ...items1.map(item => add(item, owner)),
+        ...items2.map(item => add(item, owner)),
+      ]);
       commit(SET_CHARACTER_ITEM_IDS, {
         owner,
         itemIds: await ids,
