@@ -1,5 +1,5 @@
-import Vue from 'vue';
 import _ from 'lodash';
+import Vue from 'vue';
 
 import Paths from 'B.Net/Paths';
 import Identifiers from 'B.Net/Identifiers';
@@ -9,7 +9,6 @@ import getViableProfile from 'B.Net/getViableProfile';
 import BucketMetadata from 'B.Net/metadata/BucketMetadata';
 
 import processCharacter from 'Store/modules/ActiveMembership/processCharacter';
-import processItem from 'Store/modules/ActiveMembership/processItem';
 
 import Storage from 'src/Storage';
 import { prefixURL } from 'src/utils';
@@ -19,82 +18,148 @@ import Types from 'Store/Types';
 const {
   // mutations
   SET_ID,
-  SET_NAME,
-  SET_PLATFORM,
-  SET_VAULT,
-  SET_ACCOUNT_ITEMS,
-  SET_ITEMS,
+  SET_PLATFORM_TYPE,
+
   SET_CHARACTER,
+  SET_VAULT,
   SET_ACTIVE_CHARACTER,
-  SET_STORAGE_TYPE,
+
+  SET_ITEM_INSTANCES,
+  SET_CHARACTER_ITEM_IDS,
+  SET_ACCOUNT_ITEM_IDS,
   RESET,
+
   SET_SEARCH_QUERY,
   SET_SEARCH_ACTIVE,
 
+  SET_STORAGE_TYPE,
+
+  SET_DEFINITIONS,
+
   // actions
-  FETCH_PROFILE,
-  PROCESS_PROFILE,
   GET_DEFINITIONS,
+  FETCH_PROFILE,
   PROCESS_CHARACTERS,
-  PROCESS_INVENTORIES,
-  PROCESS_PROFILE_INVENTORY,
-  PROCESS_CHARACTERS_INVENTORIES,
-  // SET_CHARACTER
+  PROCESS_INVENTORY,
 } = Types;
+
+const buckets = new Map();
+const addToBuckets = (item, options) => {
+  const { index, filter } = options;
+  const { bucket: bucketDef } = item;
+  const {
+    hash: bucketHash,
+    displayProperties: { name },
+  } = bucketDef;
+  const {
+    hidden = false,
+    order = bucketHash,
+  } = BucketMetadata[bucketHash] || {};
+  if (
+    !bucketDef.enabled ||
+    bucketDef.redacted ||
+    !name ||
+    hidden ||
+    (filter && filter.includes(bucketHash))
+  ) {
+    return;
+  }
+
+  if (!buckets.has(bucketHash)) {
+    buckets.set(bucketHash, {
+      ...bucketDef,
+      order,
+      group: [[], []],
+    });
+  }
+
+  buckets.get(bucketHash).group[index].push(item.id);
+};
+
+function emptyBucketItemIds(bucket) {
+  // eslint-disable-next-line no-param-reassign
+  bucket.group = [[], []];
+}
 
 const state = {
   id: null,
-  name: null,
-  platform: null,
+  platformType: null,
 
   activeCharacterId: Storage.get('deliverator:activeCharacterId', 'session') || null,
   characters: {},
-  vault: {},
+  vault: null,
 
-  items: {},
-  accountItems: [],
+  accountItemIds: [],
+  characterItemIds: {},
+  itemInstances: {},
 
   searchQuery: '',
   searchActive: false,
 
   storageType: Storage.get('deliverator:storageType') || 'all',
-  progress: -1,
+
+  definitions: null,
 };
 
-function bucketColumn(index, items, filter) {
-  const buckets = {};
-  _.forEach(items, (item) => {
-    const { hidden = false } = BucketMetadata[item.bucket.hash] || {};
-    if (
-      !item ||
-      !item.bucket.enabled ||
-      item.bucket.redacted ||
-      (filter && filter.includes(item.bucket.hash)) ||
-      hidden
-    ) {
-      return;
-    }
-
-    let key = _.findKey(buckets, bucket => bucket.hash === item.bucket.hash);
-    if (!key) {
-      const bucket = { ...item.bucket };
-      bucket.index = index;
-      bucket.items = [];
-
-      key = bucket.hash in BucketMetadata ?
-        BucketMetadata[bucket.hash].order :
-        bucket.hash;
-
-      buckets[key] = bucket;
-    }
-
-    buckets[key].items.push(item);
-  });
-
-  return buckets;
-}
-
 const getters = {
+  activeItemIds(state) {
+    const { activeCharacterId, characterItemIds, accountItemIds } = state;
+    const { [activeCharacterId]: ids } = characterItemIds;
+    if (ids && ids.length > 0) {
+      return ids.concat(accountItemIds);
+    }
+    return accountItemIds;
+  },
+  inactiveItemIds(state) {
+    const { activeCharacterId, characterItemIds, storageType } = state;
+    let inactiveItemIds;
+    switch (storageType) {
+      case 'all': {
+        inactiveItemIds = Object.entries(characterItemIds)
+          .filter(([characterId]) => characterId !== activeCharacterId)
+          .map(([, ids]) => ids)
+          .reduceRight((acc, ids) => (acc.concat(ids)), []);
+        break;
+      }
+      default: {
+        ({ [storageType]: inactiveItemIds } = characterItemIds);
+      }
+    }
+    return inactiveItemIds || [];
+  },
+  hasItems(state, getters) {
+    const { accountItemIds } = state;
+    const { activeItemIds, inactiveItemIds } = getters;
+    return (
+      accountItemIds.length > 0 ||
+      activeItemIds.length > 0 ||
+      inactiveItemIds.length > 0
+    );
+  },
+  bucketGroups(state, getters) {
+    const { itemInstances } = state;
+    const { activeItemIds, inactiveItemIds } = getters;
+
+    const activeItems = activeItemIds.map(id => itemInstances[id]).filter(Boolean);
+    const inactiveItems = inactiveItemIds.map(id => itemInstances[id]).filter(Boolean);
+
+    buckets.forEach(emptyBucketItemIds);
+
+    activeItems.map(item => addToBuckets(item, { index: 0 }));
+    inactiveItems.map(item => addToBuckets(item, {
+      index: 1,
+      filter: [Identifiers.BUCKET_BUILD],
+    }));
+
+    return [...buckets.values()]
+      .filter(({ group: [group1, group2] }) => group1.length > 0 || group2.length > 0)
+      .sort((bucket, compare) => {
+        const { order: bucketOrder } = bucket;
+        const { order: compareOrder } = compare;
+        if (bucketOrder === compareOrder) { return 0; }
+        return bucketOrder > compareOrder ? 1 : -1;
+      });
+  },
   sortedCharacters({ characters }) {
     return Object.values(characters).sort((c1, c2) => {
       const d1 = new Date(c1.dateLastPlayed);
@@ -104,74 +169,15 @@ const getters = {
       return d1 > d2 ? -1 : 1;
     });
   },
-  activeItems({ activeCharacterId, items, accountItems }) {
-    const characterItems = items[activeCharacterId] || [];
-    return [...characterItems, ...accountItems];
-  },
-  inactiveItems({ activeCharacterId, items, storageType }) {
-    return storageType === 'all' ?
-      _.omit(items, activeCharacterId) :
-      _.pick(items, storageType);
-  },
-  storageItems(store, getters) {
-    const storages = Object.values(getters.inactiveItems);
-    return storages.reduceRight((acc, items) => [...acc, ...items], []);
-  },
-  buckets(store, getters) {
-    const items = [getters.activeItems, getters.storageItems];
-    const bucketColumns = items.map((value, index) => (
-      index === 0 ?
-        bucketColumn(index, value) :
-        bucketColumn(index, value, [Identifiers.BUCKET_BUILD])
-    ));
-
-    const matrix = {};
-    const ranks = _.union(...bucketColumns.map(Object.keys));
-    ranks.forEach((rank) => {
-      const bucketRow = bucketColumns.map(b => b[rank]).filter(Boolean);
-      const bucket = bucketRow[0];
-
-      if (!bucket.displayProperties.name) {
-        return;
-      }
-
-      const name = _.get(bucket, ['displayProperties', 'name'], 'Unknown');
-      const identifier = bucket.hash;
-
-      matrix[rank] = {
-        name,
-        identifier,
-        buckets: bucketRow,
-      };
-    });
-
-    return matrix;
-  },
-  hasBuckets(store, getters) {
-    return Object.keys(getters.buckets).length > 0;
-  },
 };
 
 const mutations = {
-  [SET_ID]: function setName(state, id) {
+  [SET_ID]: function setId(state, id) {
     state.id = id;
   },
-  [SET_NAME]: function setName(state, name) {
-    state.name = name;
-  },
-  [SET_PLATFORM]: function setName(state, platform) {
-    state.platform = platform;
-    Storage.set('B.Net:destinyMembershipType', platform);
-  },
-
-  [SET_VAULT]: function setName(state, vault) {
-    state.vault = vault;
-  },
-  [SET_ACCOUNT_ITEMS]: function setAccountItems(state, items) {
-    state.accountItems = items;
-  },
-  [SET_ITEMS]: function addItems(state, { owner, items }) {
-    Vue.set(state.items, owner, items);
+  [SET_PLATFORM_TYPE]: function setPlatformType(state, platformType) {
+    state.platformType = platformType;
+    Storage.set('B.Net:destinyMembershipType', platformType);
   },
 
   [SET_CHARACTER]: function setCharacter(state, character) {
@@ -186,18 +192,26 @@ const mutations = {
 
     Storage.set('deliverator:activeCharacterId', id, 'session');
   },
-
-  [SET_STORAGE_TYPE]: function setStorageType(state, type) {
-    state.storageType = type;
-    Storage.set('deliverator:storageType', type);
+  [SET_VAULT]: function setVault(state, vault) {
+    state.vault = vault;
   },
 
-  [RESET]: function setCharacters() {
+  [SET_ITEM_INSTANCES]: function setItemInstances(state, itemInstances) {
+    state.itemInstances = itemInstances;
+  },
+  [SET_CHARACTER_ITEM_IDS]: function setCharacterItemIds(state, { owner, itemIds }) {
+    Vue.set(state.characterItemIds, owner, itemIds);
+  },
+  [SET_ACCOUNT_ITEM_IDS]: function setAccountItemIds(state, itemIds) {
+    state.accountItemIds = itemIds;
+  },
+  [RESET]: function reset() {
     state.id = null;
-    state.name = null;
-    state.platform = null;
-    state.items = {};
+    state.platformType = null;
     state.characters = {};
+    state.accountItemIds = [];
+    state.characterItemIds = {};
+    state.itemInstances = {};
 
     Storage.remove('B.Net:destinyMembershipType');
   },
@@ -208,137 +222,179 @@ const mutations = {
   [SET_SEARCH_ACTIVE]: function setSearchActive(state, active) {
     state.searchActive = active;
   },
+
+  [SET_STORAGE_TYPE]: function setStorageType(state, type) {
+    state.storageType = type;
+    Storage.set('deliverator:storageType', type);
+  },
+
+  [SET_DEFINITIONS]: function setDefinitions(state, db) {
+    state.definitions = db;
+  },
 };
 
 const actions = {
-  [FETCH_PROFILE]: async function fetchProfile({
-    state,
-    rootState,
-    commit,
-    dispatch,
-  }) {
-    const type = state.platform;
-    const activeMembership = type ?
-      _.find(rootState.user.destinyMemberships, { membershipType: type }) :
-      rootState.user.destinyMemberships;
-    const profile = await getViableProfile(activeMembership);
-    const { profile: { data: { userInfo } } } = profile;
-
-    commit(SET_ID, userInfo.membershipId);
-    commit(SET_NAME, userInfo.displayName);
-    commit(SET_PLATFORM, userInfo.membershipType);
-
-    await dispatch(PROCESS_PROFILE, profile);
-  },
-  [PROCESS_PROFILE]: async function processProfile({ commit, dispatch }, profile) {
+  [GET_DEFINITIONS]: async function getDefinitions(context) {
     const {
-      profileInventory: { data: profileInventory },
+      rootState: { settings: { language } },
+      commit,
+    } = context;
+
+    const manifest = retrieveManifest(language);
+    const definitions = Definitions.retrieve(language, await manifest);
+    commit(SET_DEFINITIONS, definitions);
+    return definitions;
+  },
+  [FETCH_PROFILE]: async function fetchProfile(context, platformType) {
+    const {
+      state,
+      rootState: { user: { destinyMemberships } },
+      commit,
+      dispatch,
+    } = context;
+
+    if (platformType && platformType !== state.platformType) {
+      commit(SET_PLATFORM_TYPE, platformType);
+    }
+
+    const definitions = dispatch(GET_DEFINITIONS);
+
+    const activeMembership = platformType ?
+      destinyMemberships.find(({ membershipType }) => membershipType === platformType) :
+      destinyMemberships;
+    const {
+      profile: { data: { userInfo } },
+      profileInventory: { data: { items: profileInventory } },
       characters: { data: characters },
       characterInventories: { data: characterInventories },
       characterEquipment: { data: characterEquipment },
       itemComponents,
-    } = profile;
+    } = await getViableProfile(activeMembership);
 
-    const definitions = await dispatch(GET_DEFINITIONS);
+    commit(SET_ID, userInfo.membershipId);
+    if (platformType) {
+      console.assert(platformType === userInfo.membershipType);
+    } else {
+      commit(SET_PLATFORM_TYPE, userInfo.membershipType);
+    }
 
-    const processCharacters = dispatch(PROCESS_CHARACTERS, { characters, definitions });
-    const [profInv, charInvs] = await dispatch(PROCESS_INVENTORIES, {
-      charactersIds: Object.keys(characters),
-      profileInventory,
-      characterInventories,
-      characterEquipment,
-      itemComponents,
-      definitions,
-    });
-    const [accountItems, vaultItems] = _.partition(profInv, { owner: 'account' });
-    commit(SET_ACCOUNT_ITEMS, accountItems);
-    commit(SET_ITEMS, { owner: Identifiers.VAULT, items: vaultItems });
-
-    charInvs.forEach(async ({ id, items }) => commit(SET_ITEMS, { owner: id, items: await items }));
-
-    const { displayProperties: { name, icon } } = await definitions.Vendor[Identifiers.VAULT];
+    return Promise.all([
+      dispatch(PROCESS_CHARACTERS, { definitions: await definitions, characters }),
+      dispatch(PROCESS_INVENTORY, {
+        characterIds: Object.keys(characters),
+        profileInventory,
+        characterInventories,
+        characterEquipment,
+        itemComponents,
+        definitions: await definitions,
+      }),
+    ]);
+  },
+  [PROCESS_CHARACTERS]: async function processCharacters({ commit }, { characters, definitions }) {
+    const {
+      displayProperties: {
+        name,
+        icon,
+      },
+    } = await definitions.Vendor[Identifiers.VAULT];
     commit(SET_VAULT, {
       id: Identifiers.VAULT,
       name,
       emblemPath: prefixURL(icon, Paths.BASE),
     });
 
-    return Promise.all((await processCharacters)
-      .map(character => dispatch(SET_CHARACTER, character)));
-  },
-  [GET_DEFINITIONS]: async function getDefinitions({ rootState, commit }) {
-    const manifest = retrieveManifest(
-      rootState.settings.language,
-      (progress) => { commit('SET_PROGRESS', progress, { root: true }); },
-    );
-    return Definitions.retrieve(rootState.settings.language, await manifest);
-  },
-  [PROCESS_CHARACTERS]: function processCharacters(context, { definitions, characters }) {
-    const processor = character => processCharacter({ definitions, character });
+    const processor = async character => processCharacter({
+      definitions,
+      character,
+    }).then((character) => {
+      if (!state.activeCharacterId) {
+        commit(SET_ACTIVE_CHARACTER, character.id);
+      }
+      commit(SET_CHARACTER, character);
+    });
+
     return Promise.all(Object.values(characters).map(processor));
   },
-  [PROCESS_INVENTORIES]: async function processInventories({ dispatch }, {
-    charactersIds,
-    profileInventory,
-    characterInventories,
-    characterEquipment,
-    itemComponents,
-    definitions,
-  }) {
-    return Promise.all([
-      dispatch(PROCESS_PROFILE_INVENTORY, { profileInventory, itemComponents, definitions }),
-      dispatch(PROCESS_CHARACTERS_INVENTORIES, {
-        charactersIds,
-        characterInventories,
-        characterEquipment,
-        itemComponents,
-        definitions,
-      }),
-    ]);
-  },
-  [PROCESS_PROFILE_INVENTORY]: async function processProfileInventory(context, {
-    profileInventory,
-    itemComponents,
-    definitions,
-  }) {
-    const processor = item => processItem({
+  [PROCESS_INVENTORY]: async function processInventory({ commit }, payload) {
+    const {
+      characterIds,
+      profileInventory,
+      characterInventories,
+      characterEquipment,
+      itemComponents,
       definitions,
-      components: itemComponents,
-      item,
+    } = payload;
+
+    const itemInstances = {};
+    const add = async (item) => {
+      const id = item.itemInstanceId || _.uniqueId('item_');
+      const { data: { [item.itemInstanceId]: instance = {} } } = itemComponents.instances;
+
+      const itemDef = await definitions.InventoryItem[item.itemHash];
+      const bucketDef = await definitions.InventoryBucket[itemDef.inventory.bucketTypeHash];
+      const {
+        hash: bucketHash,
+        displayProperties: {
+          name,
+        },
+      } = bucketDef;
+      const { hidden = false } = BucketMetadata[bucketHash] || {};
+
+      if (
+        !bucketDef.enabled ||
+        bucketDef.redacted ||
+        !name ||
+        hidden
+      ) {
+        return -1;
+      }
+
+      itemInstances[id] = {
+        ...item,
+        ...instance,
+        id,
+        bucket: bucketDef,
+        currentBucket: await definitions.InventoryBucket[item.bucketHash],
+      };
+
+      return id;
+    };
+
+    const [vaultItems, accountItems] = await profileInventory.reduce(async (acc, item) => {
+      const itemDef = await definitions.InventoryItem[item.itemHash];
+      const bucket = await definitions.InventoryBucket[itemDef.inventory.bucketTypeHash];
+      const currentBucket = await definitions.InventoryBucket[item.bucketHash];
+      let key = 0;
+      if (bucket.scope === 1) {
+        if (bucket.hash === currentBucket.hash && bucket.location === 0) {
+          key = 1;
+        }
+      }
+      (await acc)[key].push(add(item));
+      return acc;
+    }, Promise.resolve([[], []]));
+
+    commit(SET_ACCOUNT_ITEM_IDS, await Promise.all(accountItems));
+
+    commit(SET_CHARACTER_ITEM_IDS, {
       owner: Identifiers.VAULT,
+      itemIds: await Promise.all(vaultItems),
     });
-    return Promise.all(profileInventory.items.map(processor));
-  },
-  [PROCESS_CHARACTERS_INVENTORIES]: function processCharactersInventories(context, {
-    charactersIds,
-    characterInventories,
-    characterEquipment,
-    itemComponents,
-    definitions,
-  }) {
-    return charactersIds.map((id) => {
-      const processor = item => processItem({
-        definitions,
-        components: itemComponents,
-        item,
-        owner: id,
+
+    await Promise.all(characterIds.map(async (owner) => {
+      const { [owner]: { items: items1 } } = characterInventories;
+      const { [owner]: { items: items2 } } = characterEquipment;
+
+      const ids = Promise.all([...items1.map(add), ...items2.map(add)]);
+      commit(SET_CHARACTER_ITEM_IDS, {
+        owner,
+        itemIds: await ids,
       });
-      const processedItems = [characterInventories, characterEquipment]
-        .reduce((acc, inventory) => ([
-          ...acc,
-          ...((inventory[id] || {}).items || []),
-        ]), [])
-        .map(processor);
 
-      return { id, items: Promise.all(processedItems) };
-    });
-  },
+      return ids;
+    }));
 
-  [SET_CHARACTER]: function setCharacter({ state, commit }, character) {
-    commit(SET_CHARACTER, character);
-    if (!state.activeCharacterId) {
-      commit(SET_ACTIVE_CHARACTER, character.id);
-    }
+    commit(SET_ITEM_INSTANCES, itemInstances);
   },
 };
 

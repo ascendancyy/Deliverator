@@ -65,15 +65,14 @@ export default {
     });
     store.commit('SET_USER_MEMBERSHIPS', destinyMemberships);
 
-    const platform = Storage.get('B.Net:destinyMembershipType');
-    if (platform) {
-      store.commit('activeMembership/SET_PLATFORM', platform);
-    }
-
     Vue.nextTick(async () => {
       try {
-        await store.dispatch('activeMembership/FETCH_PROFILE');
+        await store.dispatch(
+          'activeMembership/FETCH_PROFILE',
+          Storage.get('B.Net:destinyMembershipType'),
+        );
       } catch (e) {
+        console.warn(e);
         store.commit('activeMembership/RESET');
       }
     });

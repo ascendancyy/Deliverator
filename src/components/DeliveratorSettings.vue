@@ -103,7 +103,10 @@ export default {
       get() { return this.$store.state.settings.language; },
       set(language) {
         this.$store.commit('settings/SET_LANGUAGE', language);
-        this.$store.dispatch('activeMembership/FETCH_PROFILE');
+        this.$store.dispatch(
+          'activeMembership/FETCH_PROFILE',
+          this.$store.state.activeMembership.platformType,
+        );
       },
     },
     itemSize: {

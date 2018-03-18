@@ -6,22 +6,24 @@
       :leave-active-class="$style.loadingLeaveActive"
       :leave-to-class="$style.loadingLeaveTo">
       <ul
-        v-show="hasBuckets"
+        v-show="hasItems"
         :class="$style.items">
         <ItemManagerSplitBucket
-          v-for="({ buckets, identifier, name }) in bucketsList"
-          :key="identifier"
-          :name="name"
-          :buckets="buckets"
-          :expanded="expanded[identifier]"
-          v-on="$listeners"
+          v-for="bucket in bucketGroups"
+          :key="bucket.hash"
+          :buckets="bucket.group"
+          :expanded="expanded[bucket.hash]"
+          :item-capacity="itemCapacity(bucket)"
+          :hash="bucket.hash"
+          :name="bucket.displayProperties.name"
           :scroll-root="scrollRoot"
-          @toggle="expand => $set(expanded, identifier, !expanded[identifier])"
+          v-on="$listeners"
+          @toggle="expand => $set(expanded, bucket.hash, !expanded[bucket.hash])"
         />
       </ul>
     </transition>
     <div
-      v-if="!hasBuckets"
+      v-if="!hasItems"
       key="loading"
       :class="$style.loading">
       <div :class="$style.loader">
@@ -59,12 +61,23 @@ export default {
     return { expanded, scrollRoot: null };
   },
   computed: {
-    ...mapGetters('activeMembership', {
-      bucketsList: 'buckets',
-      hasBuckets: 'hasBuckets',
-    }),
+    ...mapGetters('activeMembership', [
+      'hasItems',
+      'bucketGroups',
+    ]),
   },
   mounted() { this.scrollRoot = this.$el.querySelector(`.${this.$style.items}`); },
+  methods: {
+    itemCapacity(bucket) {
+      const [activeBucket] = bucket.group;
+      if (activeBucket.length <= 0) {
+        return '';
+      }
+
+      const max = bucket.itemCount;
+      return max > 0 ? `(${activeBucket.length}/${max})` : '';
+    },
+  },
 };
 </script>
 
