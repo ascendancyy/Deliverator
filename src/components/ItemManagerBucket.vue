@@ -1,11 +1,14 @@
 <template>
-  <div :class="$style.bucket">
+  <div
+    v-if="bucketItemIds.length > 0"
+    :class="$style.bucket">
     <div :class="$style.content">
       <div
         v-if="(showEquipped && splitBucket.equippedItem) || loading"
         :class="$style.equipped">
         <ItemManagerItem
-          :item="splitBucket.equippedItem"
+          :key="splitBucket.equippedItem.id"
+          :instance="splitBucket.equippedItem"
           v-bind="$attrs"
           v-on="$listeners"
         />
@@ -18,7 +21,7 @@
           v-for="item in splitBucket.unequippedItems"
           :key="item.id">
           <ItemManagerItem
-            :item="item"
+            :instance="item"
             v-bind="$attrs"
             v-on="$listeners"
           />
@@ -40,9 +43,9 @@ export default {
   },
   inheritAttrs: false,
   props: {
-    bucket: {
-      type: Object,
-      required: false,
+    bucketItemIds: {
+      type: Array,
+      required: true,
     },
     loading: {
       type: Boolean,
@@ -55,24 +58,25 @@ export default {
     },
   },
   computed: {
+    items() {
+      return this.bucketItemIds.map(id => this.$store.state.activeMembership.itemInstances[id]);
+    },
     splitBucket() {
-      const splitBucket = {
-        equippedItem: undefined,
-        unequippedItems: undefined,
+      const bucket = {
+        equippedItem: null,
+        unequippedItems: null,
       };
 
-      if (this.bucket) {
-        const bucketItems = this.bucket.items;
-        splitBucket.unequippedItems = bucketItems;
+      const { items: bucketItems } = this;
+      bucket.unequippedItems = bucketItems;
 
-        if (this.showEquipped) {
-          // eslint-disable-next-line no-bitwise
-          const split = _.partition(bucketItems, item => item.transferStatus & 1);
-          [[splitBucket.equippedItem], splitBucket.unequippedItems] = split;
-        }
+      if (this.showEquipped) {
+        // eslint-disable-next-line no-bitwise
+        const split = _.partition(bucketItems, item => item.transferStatus & 1);
+        [[bucket.equippedItem], bucket.unequippedItems] = split;
       }
 
-      return splitBucket;
+      return bucket;
     },
   },
 };

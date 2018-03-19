@@ -23,7 +23,7 @@ function getAllRecords(manifest, table) {
   return new Promise((resolve) => {
     while (statement.step()) {
       const definition = JSON.parse(statement.getAsObject().json);
-      collection[definition.hash] = definition;
+      collection[definition.hash] = Object.freeze(definition);
     }
     statement.free();
     resolve(Object.freeze(collection));
@@ -38,7 +38,7 @@ function getRecord(manifest, table, hash) {
     const { json } = statement.getAsObject([new Int32Array([hash])[0]]);
 
     statement.reset();
-    resolve(json ? JSON.parse(json) : undefined);
+    resolve(json ? Object.freeze(JSON.parse(json)) : undefined);
   });
 }
 

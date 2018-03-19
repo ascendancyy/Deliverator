@@ -1,6 +1,6 @@
 <template>
   <div
-    :data-item-id="item.id || item.uniqueId"
+    :data-item-id="instance.id"
     :class="$style.item"
     @click.capture.stop="click"
     @mousemove.passive="mouseMove"
@@ -11,7 +11,7 @@
       :leave-active-class="doTransition ? $style.imageLeaveActive : ''"
       :leave-to-class="doTransition ? $style.imageLeaveTo : ''">
       <BaseSkeleton
-        v-if="!imageLoaded"
+        v-if="!imageLoaded || !definition"
         key="skeleton"
         :active="visible"
         :style="{
@@ -31,8 +31,8 @@
           {{ label.value }}
         </div>
         <img
-          :src="item.icon"
-          :alt="item.name"
+          :src="itemIconSrc"
+          :alt="itemName"
           :class="$style.icon">
       </div>
     </transition>
@@ -40,14 +40,18 @@
 </template>
 
 <script>
-import { random } from 'src/utils';
+import { mapState } from 'vuex';
 
-const cache = new Set([]);
+import Paths from 'B.Net/Paths';
+
+import { random, prefixURL } from 'src/utils';
+
+const iconCache = new Set();
 
 export default {
   name: 'ItemManagerItem',
   props: {
-    item: {
+    instance: {
       type: Object,
       required: true,
     },
@@ -57,24 +61,37 @@ export default {
     },
   },
   data() {
-    const inCache = cache.has(this.item.icon);
     return {
+      definition: null,
+
       visible: false,
-      inCache,
-      imageLoaded: inCache,
-      doTransition: !inCache,
-      maybeLazyLoad: !inCache,
+      imageLoaded: false,
+      doTransition: false,
+      maybeLazyLoad: false,
       observer: null,
     };
   },
   computed: {
+    ...mapState('activeMembership', [
+      'definitions',
+      'inspectedItemId',
+      'selectedItemId',
+    ]),
+    itemIconSrc() {
+      if (!this.definition) {
+        return '';
+      }
+      const { icon } = this.definition.displayProperties;
+      return !this.definition.displayProperties.hasIcon ?
+        'https://www.bungie.net/img/misc/missing_icon_d2.png' :
+        prefixURL(icon, Paths.BASE);
+    },
     classes() {
       const classes = [
         this.$style.content,
         {
           // eslint-disable-next-line no-bitwise
-          [this.$style.equipped]: this.item.transferStatus & 1,
-          [this.$style.unequippable]: !this.item.equippable,
+          [this.$style.equipped]: this.instance.transferStatus & 1,
 
           // TODO: Figure out an equivalent
           // [this.$style.complete]: this.item.isGridComplete,
@@ -82,15 +99,26 @@ export default {
         },
       ];
 
-      if (this.item.damageType) {
-        const damageClassName = this.$style[`damage-${this.item.damageType}`];
+      const { damageType } = this.instance;
+      if (damageType) {
+        const damageClassName = this.$style[`damage-${damageType}`];
         if (damageClassName) {
           classes.push(damageClassName);
         }
       }
 
-      if (this.item.inventory.tierType) {
-        const tierClassName = this.$style[`type-${this.item.inventory.tierType}`];
+      const { definition } = this;
+      if (definition) {
+        const {
+          equippable,
+          inventory: { tierType },
+        } = definition;
+
+        if (!equippable) {
+          classes.push(this.$style.unequippable);
+        }
+
+        const tierClassName = this.$style[`type-${tierType}`];
         if (tierClassName) {
           classes.push(tierClassName);
         }
@@ -98,17 +126,26 @@ export default {
 
       return classes;
     },
+    itemName() {
+      if (!this.definition) {
+        return '';
+      }
+      const { displayProperties: { name = '' } } = this.definition;
+      return name;
+    },
     label() {
-      if (this.item.primaryStat) {
-        const { value = '' } = this.item.primaryStat || {};
+      const { quantity, primaryStat } = this.instance;
+      const { inventory: { maxStackSize = -1 } } = this.definition;
+      if (primaryStat) {
+        const { value = '' } = primaryStat;
         return {
           type: 'lightLevel',
           value: String(value),
         };
-      } else if (this.item.stackSize && this.item.inventory.maxStackSize > 1) {
+      } else if (quantity && maxStackSize > 1) {
         return {
           type: 'quantity',
-          value: String(this.item.stackSize),
+          value: String(quantity),
         };
       }
 
@@ -117,10 +154,29 @@ export default {
         value: '',
       };
     },
-    selected() {
-      // TODO: Finish.
-      return false;
+    selected() { return this.selectedItemId === this.instance.id; },
+  },
+  watch: {
+    async definitions(newDefinitions) {
+      if (!newDefinitions) {
+        this.definition = null;
+        return;
+      }
+
+      this.setDefinition(newDefinitions);
     },
+    itemIconSrc(src) {
+      if (!this.scrollRoot) {
+        return;
+      }
+      const inCache = iconCache.has(src);
+      this.imageLoaded = inCache;
+      this.doTransition = !inCache;
+      this.maybeLazyLoad = !inCache;
+    },
+  },
+  async created() {
+    this.setDefinition(this.definitions);
   },
   mounted() {
     if (!this.scrollRoot) {
@@ -132,22 +188,23 @@ export default {
     this.observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !this.visible) {
         this.visible = true;
-
-        if (!this.maybeLazyLoad) {
-          this.imageLoaded = true;
-          this.cleanupObserver(this.observer);
-          this.observer = null;
-          return;
-        }
       }
 
-      if (entry.isIntersecting && entry.intersectionRatio >= 0 && this.maybeLazyLoad) {
+      if (!this.definition) {
+        return;
+      }
+
+      if (!this.maybeLazyLoad) {
+        this.cleanupObserver(this.observer);
+        this.imageLoaded = true;
+        this.observer = null;
+      } else if (this.maybeLazyLoad && entry.isIntersecting && entry.intersectionRatio >= 0) {
         this.cleanupObserver(this.observer);
         this.observer = null;
 
         const img = new Image();
         const imageLoaded = () => {
-          cache.add(this.item.icon);
+          iconCache.add(this.itemIconSrc);
           img.removeEventListener('load', imageLoaded);
           this.imageLoaded = true;
         };
@@ -159,7 +216,7 @@ export default {
         };
         img.addEventListener('error', imageError);
 
-        img.src = this.item.icon;
+        img.src = this.itemIconSrc;
       }
     }, {
       root: this.scrollRoot,
@@ -175,26 +232,26 @@ export default {
     }
   },
   methods: {
-    random,
-
     click(event) {
-      if (this.$itemCard) {
-        if (!this.selected) {
-          this.$itemCard.showSelected({ item: this.item, event });
-        } else {
-          this.$itemCard.hide({ forceUnpin: false });
-        }
+      if (!this.selected) {
+        this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', this.instance.id);
+        if (this.$itemCard) { this.$itemCard.pin(event); }
+      } else {
+        this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', -1);
+        if (this.$itemCard) { this.$itemCard.unpin(event); }
       }
     },
     mouseMove(event) {
-      if (!this.selected && this.$itemCard) {
-        this.$itemCard.showHover({ item: this.item, event });
+      if (this.$itemCard && this.selectedItemId === -1) {
+        this.$itemCard.moveCardToCursor(event);
+      }
+
+      if (this.inspectedItemId !== this.instance.id) {
+        this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', this.instance.id);
       }
     },
     mouseOut() {
-      if (!this.selected && this.$itemCard) {
-        this.$itemCard.hide({ forceUnpin: false });
-      }
+      this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', -1);
     },
 
     cleanupObserver(observer) {
@@ -204,6 +261,12 @@ export default {
 
       observer.disconnect();
     },
+    async setDefinition(definitions) {
+      const db = await definitions;
+      this.definition = await db.InventoryItem[this.instance.itemHash];
+    },
+
+    random,
   },
 };
 </script>
@@ -219,12 +282,17 @@ $item-border-size: 1px;
   margin: var(--item-spacing);
   width: var(--item-size);
   height: var(--item-size);
+
+  cursor: pointer;
 }
 
 .content {
   position: absolute;
+
   text-align: right;
-  cursor: pointer;
+
+  pointer-events: none;
+
   border: 1px solid $bg-primary-accent;
 
   &:not(.equipped):not(.selected):hover { box-shadow: 0 0 5px $shadow-color; }
@@ -287,6 +355,7 @@ $item-border-size: 1px;
   height: 100%;
 
   user-select: none;
+  pointer-events: none;
 
   opacity: 0.8;
   background-color: darken($bg-primary, 8%);

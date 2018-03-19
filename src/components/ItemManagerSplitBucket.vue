@@ -5,7 +5,7 @@
       type="button"
       :class="$style.name"
       @click="$emit('toggle')">
-      <div :class="$style.text">{{ name }} {{ capacity }}</div>
+      <div :class="$style.text">{{ name }} {{ itemCapacity }}</div>
       <BaseIcon
         glyph="dropdown"
         :size="8"
@@ -14,13 +14,13 @@
     </button>
 
     <div
-      v-for="bucket in buckets"
-      :key="`${bucket.index}:${bucket.hash}`"
-      :class="{ [$style.character]: bucket.index === 0, [$style.storage]: bucket.index > 0 }">
+      v-for="(ids, index) in buckets"
+      :key="`${index}:${hash}`"
+      :class="{ [$style.character]: index === 0, [$style.storage]: index > 0 }">
       <ItemManagerBucket
         v-show="expanded"
-        :bucket="bucket"
-        :show-equipped="bucket.index === 0"
+        :bucket-item-ids="ids"
+        :show-equipped="index === 0"
         v-bind="$attrs"
         v-on="$listeners"
       />
@@ -48,6 +48,15 @@ export default {
       required: false,
       default: false,
     },
+    hash: {
+      type: [String, Number],
+      required: true,
+    },
+    itemCapacity: {
+      type: String,
+      required: false,
+      default: '',
+    },
     name: {
       type: String,
       required: false,
@@ -62,23 +71,6 @@ export default {
           [this.$style.expanded]: this.expanded,
         },
       ];
-    },
-
-    capacity() {
-      const [bucket] = this.buckets;
-      if (bucket) {
-        // We show the amount if:
-        // It's the character's items or
-        // The bucket is account wide (No character owns the items)
-        const amount = bucket.index === 0 || bucket.scope > 0 ?
-          bucket.items.length :
-          0;
-        const max = bucket.itemCount || 0;
-
-        return amount > 0 && max > 0 ? `(${amount}/${max})` : '';
-      }
-
-      return '';
     },
   },
 };

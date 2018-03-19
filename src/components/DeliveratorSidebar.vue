@@ -9,7 +9,7 @@
         </BaseLabel>
         <BaseSelect
           ref="select"
-          :value="platform"
+          :value="platformType"
           :disabled="destinyMemberships.length === 0"
           placeholder="Membership"
           :options="options">
@@ -116,7 +116,7 @@ export default {
     },
   },
   computed: {
-    ...mapState('activeMembership', ['platform']),
+    ...mapState('activeMembership', ['platformType']),
     ...mapState({ destinyMemberships: state => state.user.destinyMemberships }),
     ...mapGetters('activeMembership', ['sortedCharacters']),
     activeCharacterId: {
@@ -138,14 +138,17 @@ export default {
         return false;
       }
 
-      const previousPlatform = this.platform;
+      const previousPlatformType = this.platformType;
 
       try {
-        this.$store.commit('activeMembership/SET_PLATFORM', type);
-        await this.$store.dispatch('activeMembership/FETCH_PROFILE');
+        this.$store.commit('activeMembership/SET_PLATFORM_TYPE', type);
+        await this.$store.dispatch(
+          'activeMembership/FETCH_PROFILE',
+          type,
+        );
         return true;
       } catch (e) {
-        this.$store.commit('activeMembership/SET_PLATFORM', previousPlatform);
+        this.$store.commit('activeMembership/SET_PLATFORM_TYPE', previousPlatformType);
         console.warn(e);
         return false;
       }
