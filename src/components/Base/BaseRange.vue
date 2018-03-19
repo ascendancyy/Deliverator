@@ -1,10 +1,10 @@
 <template>
   <input
-    type="range"
     :value="value"
     :min="min"
     :max="max"
     :class="$style.range"
+    type="range"
     @input="$emit('input', $event.target.value)"
   >
 </template>

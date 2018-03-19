@@ -1,7 +1,7 @@
 <template>
   <div
-    v-bind="attrs"
     v-blur="hideDropdown"
+    v-bind="attrs"
     :class="classes"
     :style="selectStyle"
     @keydown.self.esc.prevent.stop="hideDropdown"
@@ -11,9 +11,9 @@
     @keydown.self.enter.stop.prevent="handleEnter">
     <button
       ref="preview"
+      :class="$style.preview"
       tabindex="-1"
       type="button"
-      :class="$style.preview"
       @click.capture.prevent="toggleDropdown">
       <transition
         :enter-class="!multiple ? $style.textSlideEnter : ''"
@@ -52,16 +52,16 @@
       <!-- Chevron / Spinner -->
       <div :class="$style.indicator">
         <BaseIcon
-          glyph="arrow"
           :size="8"
           :class="$style.chevron"
+          glyph="arrow"
         />
         <BaseIcon
           v-if="!multiple"
           v-show="pending"
-          glyph="refresh"
           :size="8"
           :class="$style.spinner"
+          glyph="refresh"
         />
       </div>
     </button>
@@ -79,8 +79,8 @@
         :style="dropdownStyle">
         <ul
           ref="options"
-          role="listbox"
           :class="$style.dropdownList"
+          role="listbox"
           @mouseleave.self.stop="pointerIndex = -1">
           <BaseOptionWrapper
             v-for="(option, index) in options"
@@ -96,7 +96,6 @@
             @mouseenter.native.capture="setPointer(index)"
             @mousemove.native.capture="setPointer(index)">
             <slot
-              name="item"
               :visible="visible"
               :index="index"
               :value="option.value"
@@ -104,11 +103,12 @@
               :disabled="option.disabled"
               :focused="index == pointerIndex"
               :selected="Object.values(selectedIds).includes(option.id)"
-              :pending="Object.values(pendingIds).includes(option.id)">
+              :pending="Object.values(pendingIds).includes(option.id)"
+              name="item">
               <span
-                role="option"
                 :aria-selected="Object.values(selectedIds).includes(option.id)"
-                :class="$style.label">
+                :class="$style.label"
+                role="option">
                 {{ option.label }}
               </span>
             </slot>

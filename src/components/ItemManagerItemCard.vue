@@ -21,9 +21,9 @@
         </div>
         <BaseIcon
           v-show="pinned"
-          glyph="cancel"
           :size="16"
           :class="$style.closeButton"
+          glyph="cancel"
           @click="hide"
         />
       </div>
@@ -51,8 +51,8 @@
               Amount: {{ amount }}
             </BaseLabel>
             <BaseRange
-              v-model.number="amount"
               id="card-slider"
+              v-model.number="amount"
               :min="1"
               :max="itemQuantity"
             />

@@ -25,7 +25,6 @@ export default {
 };
 </script>
 
-
 <style module lang="scss">
 @import '~Snowcrash/_variables.scss';
 

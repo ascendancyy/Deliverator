@@ -3,7 +3,6 @@
     <div
       v-show="option.visible"
       :data-index="option.index"
-      role="option"
       :aria-selected="option.selected"
       :class="[
         $style.option,
@@ -13,12 +12,12 @@
           [$style.optionSelected]: option.selected,
           [$style.optionPending]: option.pending,
         },
-    ]">
+      ]"
+      role="option">
       <slot />
     </div>
   </BaseOptionTransition>
 </template>
-
 
 <script>
 export default {

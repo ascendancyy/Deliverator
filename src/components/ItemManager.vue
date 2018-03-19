@@ -28,8 +28,8 @@
       :class="$style.loading">
       <div :class="$style.loader">
         <BaseIcon
-          glyph="ghost"
           :class="$style.ghost"
+          glyph="ghost"
         />
       </div>
       <span :class="$style.message">Loading . . .</span>

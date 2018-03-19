@@ -5,17 +5,17 @@
     :leave-active-class="$style.settingsLeaveActive"
     :leave-to-class="$style.settingsLeaveTo">
     <div
-      v-if="visible"
       v-blur="hide"
+      v-if="visible"
       :class="$style.settings">
       <header
         v-once
         :class="$style.header">
         <h2 :class="$style.headerTitle">Settings</h2>
         <BaseIcon
-          glyph="cancel"
           :size="24"
           :class="$style.close"
+          glyph="cancel"
           @click="hide"
         />
       </header>
@@ -35,8 +35,8 @@
             placeholder="Language">
             <BaseOption
               slot="item"
-              slot-scope="option"
-              :option="option">
+              :option="option"
+              slot-scope="option">
               <span>{{ option.label }}</span>
             </BaseOption>
           </BaseSelect>
@@ -50,8 +50,8 @@
             Size: {{ itemSize }}px
           </BaseLabel>
           <BaseRange
-            v-model.number="itemSize"
             id="settings-item-size"
+            v-model.number="itemSize"
             :min="32"
             :max="64"
             :class="$style.input"
@@ -63,8 +63,8 @@
             Spacing: {{ itemSpacing }}px
           </BaseLabel>
           <BaseRange
-            v-model.number="itemSpacing"
             id="settings-item-spacing"
+            v-model.number="itemSpacing"
             :min="1"
             :max="6"
             :class="$style.input"

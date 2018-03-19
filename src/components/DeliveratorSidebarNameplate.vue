@@ -13,8 +13,8 @@
     </div>
     <img
       :src="character.backgroundPath"
-      alt=""
       :class="$style.background"
+      alt=""
     >
   </div>
 </template>

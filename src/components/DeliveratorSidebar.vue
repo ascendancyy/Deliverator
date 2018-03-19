@@ -11,12 +11,12 @@
           ref="select"
           :value="platformType"
           :disabled="destinyMemberships.length === 0"
-          placeholder="Membership"
-          :options="options">
+          :options="options"
+          placeholder="Membership">
           <BaseOption
             slot="item"
-            slot-scope="option"
-            :option="option">
+            :option="option"
+            slot-scope="option">
             <span :class="$style.name">{{ option.label }}</span>
             <span :class="$style.platform">{{ option.value | nameForType }}</span>
           </BaseOption>
@@ -25,21 +25,20 @@
       <BaseIcon
         v-else
         key="header-collapsed-icon"
+        :class="$style.account"
         glyph="account"
         size="1.5rem"
-        :class="$style.account"
       />
 
       <BaseIcon
-        glyph="arrow"
         :size="12"
         :class="$style.toggle"
+        glyph="arrow"
         @click="$emit('update:collapsed', !collapsed)"
       />
     </header>
     <nav :class="$style.characterSelect">
       <transition-group
-        tag="ul"
         :class="$style.characters"
         :move-class="$style.plateMove"
         :enter-class="$style.plateEnter"
@@ -47,7 +46,8 @@
         :enter-active-class="$style.plateEnterActive"
         :leave-active-class="$style.plateLeaveActive"
         :leave-class="''"
-        :leave-to-class="$style.plateLeaveTo">
+        :leave-to-class="$style.plateLeaveTo"
+        tag="ul">
         <li
           v-for="character in sortedCharacters"
           :key="character.id"

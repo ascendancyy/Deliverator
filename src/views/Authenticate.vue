@@ -7,8 +7,8 @@
       <p :class="$style.subtitle">{{ props.name }} needs access to Bungie.net.</p>
       <BaseButton
         :href="props.url"
-        type="primary"
-        :class="$style['auth-button']">
+        :class="$style['auth-button']"
+        type="primary">
         Authorize
       </BaseButton>
     </main>

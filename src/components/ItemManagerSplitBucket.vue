@@ -1,15 +1,15 @@
 <template>
   <li :class="classes">
     <button
+      :class="$style.name"
       tabindex="-1"
       type="button"
-      :class="$style.name"
       @click="$emit('toggle')">
       <div :class="$style.text">{{ name }} {{ itemCapacity }}</div>
       <BaseIcon
-        glyph="dropdown"
         :size="8"
         :class="$style.arrow"
+        glyph="dropdown"
       />
     </button>
 

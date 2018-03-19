@@ -11,10 +11,10 @@
     <input
       ref="editor"
       v-model="query"
+      :class="$style.editor"
       aria-label="Search"
       tabindex="0"
       type="text"
-      :class="$style.editor"
       @focus="searchFocus = true"
       @blur="searchFocus = false"
     >
@@ -26,9 +26,9 @@
       :leave-to-class="$style.cancelLeaveTo">
       <BaseIcon
         v-show="!(query === '')"
-        glyph="cancel"
         :size="26"
         :class="$style.cancel"
+        glyph="cancel"
         @click="clear"
       />
     </transition>

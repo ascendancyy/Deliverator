@@ -7,8 +7,8 @@
         :options="options">
         <BaseOption
           slot="item"
-          slot-scope="option"
-          :option="option">
+          :option="option"
+          slot-scope="option">
           <span>{{ option.label }}</span>
         </BaseOption>
       </BaseSelect>
@@ -16,24 +16,24 @@
 
     <div :class="$style.actions">
       <BaseButton
-        tabindex="0"
         :disabled="true"
+        tabindex="0"
         @click="$emit('B.Net:refresh')">
         <BaseIcon
           slot="icon"
-          glyph="refresh"
           :size="10"
+          glyph="refresh"
         />
         Refresh
       </BaseButton>
       <BaseButton
-        tabindex="0"
         :toggled="String(settingsVisible)"
+        tabindex="0"
         @click="$emit('app:settings:toggle')">
         <BaseIcon
           slot="icon"
-          glyph="gear"
           :size="10"
+          glyph="gear"
         />
         Settings
       </BaseButton>
