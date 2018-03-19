@@ -1,93 +1,101 @@
 <template>
-  <div
-    v-if="item"
-    ref="card"
-    :class="classes"
-    :style="cardStyle">
-    <div :class="$style.header">
-      <div :class="$style.damageColor" />
-      <div :class="$style.itemName">{{ item.name }}</div>
-      <div
-        v-if="item.typeName"
-        :class="$style.itemTier">
-        {{ item.typeName }}
-      </div>
-      <BaseIcon
-        v-show="pinned"
-        glyph="cancel"
-        :size="16"
-        :class="$style.closeButton"
-        @click="hide"
-      />
-    </div>
-
+  <transition
+    :enter-active-class="$style.cardEnterActive"
+    :leave-active-class="$style.cardLeaveActive"
+    :leave-to-class="$style.cardLeaveTo">
     <div
-      v-show="itemLocation && item.owner !== activeCharacterId"
-      :class="$style.itemLocation">
-      {{ itemLocation }}
-      <span
-        v-show="itemEquipped"
-        :class="$style.itemLocationEquipped">
-        Equipped
-      </span>
-    </div>
-
-    <div
-      v-show="!pinned && item.description"
-      :class="$style.itemDescription">
-      {{ item.description }}
-    </div>
-    <template v-if="pinned">
-      <template v-if="item.inventory.maxStackSize > 1 && itemStackSize > 1">
-        <div :class="$style.itemAmountSlider">
-          <BaseLabel for="card-slider">
-            Amount: {{ amount }}
-          </BaseLabel>
-          <BaseRange
-            v-model.number="amount"
-            id="card-slider"
-            :min="1"
-            :max="itemStackSize"
-          />
+      v-blur="pinned ? clickOut : null"
+      v-if="itemInstance && definition"
+      ref="card"
+      :class="classes"
+      :style="cardStyle">
+      <div :class="$style.header">
+        <div :class="$style.damageColor" />
+        <div :class="$style.itemName">
+          {{ definition.displayProperties.name }}
         </div>
-      </template>
-      <div :class="$style.actions">
-        <template v-for="{ name, location } in actions">
-          <div
-            :key="`action-${location.id}`"
-            :class="[
-              $style.action,
-              { [$style.actionHover]: hoveredActionId === location.id }
-            ]"
-            @mouseleave="hoveredActionId = -1"
-            @mouseenter="hoveredActionId = location.id"
-            @click="action(location.id)">
-            <CharacterEmblem
-              :size="288 / Math.max(Object.keys(actions).length, 3)"
-              :src="location.emblemPath"
+        <div
+          v-if="definition.itemTypeDisplayName"
+          :class="$style.itemTier">
+          {{ definition.itemTypeDisplayName }}
+        </div>
+        <BaseIcon
+          v-show="pinned"
+          glyph="cancel"
+          :size="16"
+          :class="$style.closeButton"
+          @click="hide"
+        />
+      </div>
+
+      <div
+        v-show="itemLocation && itemInstance.owner !== activeCharacterId"
+        :class="$style.itemLocation">
+        {{ itemLocation }}
+        <span
+          v-show="itemEquipped"
+          :class="$style.itemLocationEquipped">
+          Equipped
+        </span>
+      </div>
+
+      <div
+        v-show="!pinned && definition.displayProperties.description"
+        :class="$style.itemDescription">
+        {{ definition.displayProperties.description }}
+      </div>
+      <template v-if="pinned">
+        <template v-if="definition.inventory.maxStackSize > 1 && itemQuantity > 1">
+          <div :class="$style.itemAmountSlider">
+            <BaseLabel for="card-slider">
+              Amount: {{ amount }}
+            </BaseLabel>
+            <BaseRange
+              v-model.number="amount"
+              id="card-slider"
+              :min="1"
+              :max="itemQuantity"
             />
           </div>
-          <div
-            :key="`label-${location.id}`"
-            :class="[
-              $style.actionLabelWrapper,
-              { [$style.actionLabelHover]: hoveredActionId === location.id }
-            ]"
-            :style="{ color: `#${location.emblemColor}` }"
-            @mouseleave="hoveredActionId = -1"
-            @mouseenter="hoveredActionId = location.id"
-            @click="action(location.id)">
-            <span :class="$style.actionLabel">{{ name }}</span>
-          </div>
         </template>
-      </div>
-    </template>
-  </div>
+        <div :class="$style.actions">
+          <template v-for="{ name, location } in actions">
+            <div
+              :key="`action-${location.id}`"
+              :class="[
+                $style.action,
+                { [$style.actionHover]: hoveredActionId === location.id }
+              ]"
+              @mouseleave="hoveredActionId = -1"
+              @mouseenter="hoveredActionId = location.id"
+              @click="action(location.id)">
+              <CharacterEmblem
+                :size="288 / Math.max(Object.keys(actions).length, 3)"
+                :src="location.emblemPath"
+              />
+            </div>
+            <div
+              :key="`label-${location.id}`"
+              :class="[
+                $style.actionLabelWrapper,
+                { [$style.actionLabelHover]: hoveredActionId === location.id }
+              ]"
+              :style="{ color: `#${location.emblemColor}` }"
+              @mouseleave="hoveredActionId = -1"
+              @mouseenter="hoveredActionId = location.id"
+              @click="action(location.id)">
+              <span :class="$style.actionLabel">{{ name }}</span>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </transition>
 </template>
 
 <script>
 import _ from 'lodash';
-import { mapState } from 'vuex';
+import { mapState, mapGetters } from 'vuex';
 
 import Store from 'src/Store';
 
@@ -95,7 +103,7 @@ import Identifiers from 'B.Net/Identifiers';
 
 import CharacterEmblem from 'components/CharacterEmblem';
 
-import { raf, cancelRaf, style } from 'src/utils';
+import { style } from 'src/utils';
 
 function viewport() {
   return {
@@ -113,13 +121,9 @@ export default {
   data() {
     return {
       amount: 0,
-      item: null,
-
-      visible: false,
-      pinned: false,
+      definition: null,
 
       hoveredActionId: -1,
-      hideRafId: -1,
 
       windowSize: viewport(),
 
@@ -129,7 +133,15 @@ export default {
     };
   },
   computed: {
-    ...mapState('activeMembership', ['activeCharacterId', 'characters', 'vault']),
+    ...mapGetters('activeMembership', ['sortedCharacters']),
+    ...mapState('activeMembership', [
+      'definitions',
+      'activeCharacterId',
+      'characters',
+      'vault',
+      'inspectedItemId',
+      'selectedItemId',
+    ]),
     classes() {
       const classes = [
         this.$style.card,
@@ -139,20 +151,19 @@ export default {
         },
       ];
 
-      const { item } = this;
-      if (!item) {
-        return classes;
-      }
-
-      if (this.item.damageType) {
-        const damageClassName = this.$style[`damage-${this.item.damageType}`];
+      const { damageType } = this.itemInstance;
+      if (damageType) {
+        const damageClassName = this.$style[`damage-${damageType}`];
         if (damageClassName) {
           classes.push(damageClassName);
         }
       }
 
-      if (item.inventory.tierType) {
-        const tierClassName = this.$style[`tier-${item.inventory.tierType}`];
+      const { definition } = this;
+      if (definition) {
+        const { inventory: { tierType } } = definition;
+
+        const tierClassName = this.$style[`tier-${tierType}`];
         if (tierClassName) {
           classes.push(tierClassName);
         }
@@ -161,16 +172,29 @@ export default {
       return classes;
     },
 
+    pinned() { return this.selectedItemId !== -1; },
+
+    itemInstance() {
+      const { inspectedItemId, selectedItemId } = this;
+      if (inspectedItemId === -1 && selectedItemId === -1) {
+        return null;
+      }
+
+      const id = selectedItemId !== -1 ?
+        selectedItemId :
+        inspectedItemId;
+      return this.$store.state.activeMembership.itemInstances[id];
+    },
     itemLocation() {
-      const { item } = this;
-      if (item.owner === Identifiers.VAULT) {
+      const { itemInstance } = this;
+      if (itemInstance.owner === Identifiers.VAULT) {
         return this.vault.name;
-      } else if (item.owner === 'account') {
+      } else if (itemInstance.owner === 'account') {
         return 'Account';
       }
 
       try {
-        const { race, class: characterClass, light } = this.characters[item.owner];
+        const { race, class: characterClass, light } = this.characters[itemInstance.owner];
         return `${race} ${characterClass} (${light})`;
       } catch (e) {
         return '';
@@ -178,44 +202,44 @@ export default {
     },
     itemEquipped() {
       // eslint-disable-next-line no-bitwise
-      return this.item.transferStatus & 1 || false;
+      return this.itemInstance.transferStatus & 1 || false;
     },
-    itemStackSize() {
-      return this.item.stackSize || 0;
+    itemQuantity() {
+      return this.itemInstance.quantity || 0;
     },
 
     actions() {
-      const { item } = this;
+      const { itemInstance, definition } = this;
       if (
-        !item ||
-        (item && item.nonTransferrable && !item.canEquip)
+        !definition ||
+        (definition && definition.nonTransferrable && !itemInstance.canEquip)
       ) {
         return [];
       }
 
-      if (item.owner === 'account') {
+      if (itemInstance.owner === 'account') {
         return [{
           name: 'Store',
           location: this.vault,
         }];
-      } else if (item.bucket.location === 0) {
+      } else if (itemInstance.bucket.location === 0) {
         return [{
           name: 'Take',
           location: this.characters[this.activeCharacterId],
         }];
       }
 
-      const characters = Object.values(this.characters);
-      if (item.owner !== Identifiers.VAULT) {
+      const characters = this.sortedCharacters.slice();
+      if (itemInstance.owner !== Identifiers.VAULT) {
         characters.unshift(this.vault);
       }
 
       const locations = characters.filter((character) => {
-        const isOwner = character.id === item.owner;
+        const isOwner = character.id === itemInstance.owner;
         if (
           this.itemEquipped ||
-          (isOwner && !item.canEquip) ||
-          (!isOwner && (item.nonTransferrable || item.transferStatus > 0))
+          (isOwner && !itemInstance.canEquip) ||
+          (!isOwner && (definition.nonTransferrable || itemInstance.transferStatus > 0))
         ) {
           return false;
         }
@@ -224,7 +248,7 @@ export default {
       });
 
       return locations.map((location) => {
-        const isOwner = location.id === item.owner;
+        const isOwner = location.id === itemInstance.owner;
         let name = '';
         if (location.id === Identifiers.VAULT) {
           name = 'Store';
@@ -236,6 +260,25 @@ export default {
           location,
         };
       });
+    },
+  },
+  watch: {
+    async definitions(newDefinitions) {
+      if (!newDefinitions || !this.itemInstance) {
+        return;
+      }
+
+      const db = await newDefinitions;
+      this.definition = await db.InventoryItem[this.itemInstance.itemHash];
+    },
+    async itemInstance(newItemInstance) {
+      if (!newItemInstance) {
+        return;
+      }
+
+      this.amount = newItemInstance.quantity || 0;
+      const db = await this.definitions;
+      this.definition = await db.InventoryItem[newItemInstance.itemHash];
     },
   },
   mounted() {
@@ -252,46 +295,14 @@ export default {
       this.hide();
     },
 
-    showHover({ item, event }) {
-      if (this.pinned) {
-        return;
-      }
-
-      if (this.hideRafId !== -1) {
-        cancelRaf(this.hideRafId);
-      }
-
-      this.item = item;
-      this.$nextTick(() => {
-        this.visible = true;
-        this.moveCardToCursor(this.$refs.card, event);
-      });
-    },
-    showSelected({ item, event }) {
-      if (this.pinned && item.uniqueId === this.item.uniqueId) {
-        this.item = item;
-        this.unpin(event);
-
-        return;
-      }
-
-      if (this.hideRafId !== -1) {
-        cancelRaf(this.hideRafId);
-      }
-
+    pin({ target }) {
       document.addEventListener('scroll', this.hide, { capture: true, passive: true });
-      document.addEventListener('click', this.clickOut, { capture: false, passive: true });
 
-      this.pinned = true;
-      this.visible = true;
-      this.item = item;
-      this.amount = item.stackSize;
-
-      const rect = event.target.getBoundingClientRect();
+      const rect = target.getBoundingClientRect();
       let x = rect.right + 2;
       let y = rect.top - 1;
       this.$nextTick(() => {
-        const { width = 0, height = 0 } = this.$refs.card.getBoundingClientRect();
+        const { width = 288, height = 0 } = this.$refs.card.getBoundingClientRect();
         if (width === 0 && height === 0) {
           return;
         }
@@ -310,15 +321,14 @@ export default {
         };
       });
     },
-    moveCardToCursor(card, { clientX, clientY } = {}) {
-      if (!this.visible || !card) {
-        return;
-      }
+    unpin(event) {
+      document.removeEventListener('scroll', this.hide, { capture: true, passive: true });
+      this.moveCardToCursor(event);
+    },
 
-      const { width = 0, height = 0 } = card.getBoundingClientRect();
-      if (width === 0 && height === 0) {
-        return;
-      }
+    moveCardToCursor({ clientX, clientY }) {
+      const { card } = this.$refs;
+      const { width = 288, height = 0 } = (card && card.getBoundingClientRect()) || {};
 
       const offsetX = parseInt(style(document.documentElement, '--item-size'), 10) / 2;
       let x = clientX + offsetX;
@@ -339,43 +349,15 @@ export default {
       };
     },
 
-    unpin(event) {
+    hide() {
       document.removeEventListener('scroll', this.hide, { capture: true, passive: true });
-      document.removeEventListener('click', this.clickOut, { capture: false, passive: true });
-      if (this.pinned) {
-        this.pinned = false;
-        this.$nextTick(() => this.moveCardToCursor(this.$refs.card, event));
-      }
-    },
-    hide(event) {
-      const { forceUnpin = true } = event || {};
-      if ((this.pinned && !forceUnpin) || !this.visible) {
-        return;
-      }
-
-      cancelRaf(this.hideRafId);
-      this.hideRafId = raf(() => {
-        this.visible = false;
-        this.item = null;
-
-        if (this.pinned && forceUnpin) {
-          this.unpin(event);
-        }
-
-        this.hideRafId = -1;
-      });
+      this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', -1);
+      this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', -1);
     },
 
-    clickOut(event) {
-      const inElm = this.$el.contains(event.target);
-      if (inElm) {
-        return;
-      }
-      const { itemId } = event.target.dataset;
-      if (!itemId || !inElm) {
-        document.removeEventListener('click', this.clickOut, { capture: false, passive: true });
-        this.hide(event);
-      }
+    clickOut({ target }) {
+      const { itemId } = target.dataset;
+      if (!itemId) { this.hide(); }
     },
   },
 };
@@ -587,4 +569,11 @@ $item-card-width: 288px;
   z-index: 1;
   color: $fg-white;
 }
+
+.cardEnterActive,
+.cardLeaveActive {
+  transition: opacity 60ms linear;
+}
+
+.cardLeaveTo { opacity: 0; }
 </style>

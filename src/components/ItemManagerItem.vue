@@ -232,24 +232,26 @@ export default {
     }
   },
   methods: {
-    click() {
-      if (this.$itemCard) {
-        if (!this.selected) {
-          this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', this.instance.id);
-        } else {
-          this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', -1);
-        }
+    click(event) {
+      if (!this.selected) {
+        this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', this.instance.id);
+        if (this.$itemCard) { this.$itemCard.pin(event); }
+      } else {
+        this.$store.commit('activeMembership/SET_SELECTED_ITEM_ID', -1);
+        if (this.$itemCard) { this.$itemCard.unpin(event); }
       }
     },
-    mouseMove() {
-      if (this.$itemCard && this.inspectedItemId !== this.instance.id) {
+    mouseMove(event) {
+      if (this.$itemCard && this.selectedItemId === -1) {
+        this.$itemCard.moveCardToCursor(event);
+      }
+
+      if (this.inspectedItemId !== this.instance.id) {
         this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', this.instance.id);
       }
     },
     mouseOut() {
-      if (this.$itemCard) {
-        this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', -1);
-      }
+      this.$store.commit('activeMembership/SET_INSPECTED_ITEM_ID', -1);
     },
 
     cleanupObserver(observer) {
@@ -280,12 +282,17 @@ $item-border-size: 1px;
   margin: var(--item-spacing);
   width: var(--item-size);
   height: var(--item-size);
+
+  cursor: pointer;
 }
 
 .content {
   position: absolute;
+
   text-align: right;
-  cursor: pointer;
+
+  pointer-events: none;
+
   border: 1px solid $bg-primary-accent;
 
   &:not(.equipped):not(.selected):hover { box-shadow: 0 0 5px $shadow-color; }
@@ -348,6 +355,7 @@ $item-border-size: 1px;
   height: 100%;
 
   user-select: none;
+  pointer-events: none;
 
   opacity: 0.8;
   background-color: darken($bg-primary, 8%);
