@@ -26,7 +26,7 @@
         key="item"
         :class="classes">
         <div
-          v-if="label.value"
+          v-if="label"
           :class="$style[label.type]">
           {{ label.value }}
         </div>
@@ -43,6 +43,7 @@
 import { mapState } from 'vuex';
 
 import Paths from 'B.Net/Paths';
+import Identifiers from 'B.Net/Identifiers';
 
 import { random, prefixURL } from 'src/utils';
 
@@ -134,7 +135,11 @@ export default {
       return name;
     },
     label() {
-      const { quantity, primaryStat } = this.instance;
+      const { bucket, quantity, primaryStat } = this.instance;
+      if (bucket.hash === Identifiers.BUCKET_BUILD) {
+        return null;
+      }
+
       const { inventory: { maxStackSize = -1 } } = this.definition;
       if (primaryStat) {
         const { value = '' } = primaryStat;
@@ -149,10 +154,7 @@ export default {
         };
       }
 
-      return {
-        type: 'default',
-        value: '',
-      };
+      return null;
     },
     selected() { return this.selectedItemId === this.instance.id; },
   },
