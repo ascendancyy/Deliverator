@@ -13,7 +13,7 @@ function bind(el, binding) {
   cleanup(el);
   const { value: cb, name } = binding;
   if (typeof cb !== 'function') {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && cb) {
       Vue.util.warn(`v-${name} expects a function for its binding, but got ${cb.toString()}`);
     }
     return;
