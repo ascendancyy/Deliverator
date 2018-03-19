@@ -84,28 +84,9 @@ export default {
 <style module lang="scss">
 @import '~Snowcrash/_variables.scss';
 
-@keyframes float {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: translateY(0);
-  }
-
-  50% {
-    opacity: 0.4;
-    transform: translateY(-20%);
-  }
-}
-
-@keyframes fade {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
+@keyframes rotate {
+  0% { transform: rotateZ(0); }
+  100% { transform: rotateZ(1turn); }
 }
 
 .itemManager {
@@ -130,14 +111,6 @@ export default {
 .message {
   font-size: $font-scale-3;
   opacity: 0.5;
-}
-
-.loader:after,
-.ghost {
-  animation-duration: 2222ms;
-  animation-timing-function: $standard-curve;
-  animation-iteration-count: infinite;
-  animation-fill-mode: both;
 }
 
 .loader {
@@ -171,9 +144,14 @@ export default {
   width: 48px;
   height: 48px;
 
+  opacity: 0.5;
   fill: $fg-black;
 
-  animation-name: float;
+  animation-name: rotate;
+  animation-duration: 1950ms;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+
   will-change: transform;
 }
 
