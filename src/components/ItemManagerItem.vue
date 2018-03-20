@@ -168,7 +168,7 @@ export default {
       this.setDefinition(newDefinitions);
     },
     itemIconSrc(src) {
-      if (!this.scrollRoot) {
+      if (!this.scrollRoot || this.imageLoaded) {
         return;
       }
       const inCache = iconCache.has(src);
