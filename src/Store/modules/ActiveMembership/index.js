@@ -24,7 +24,8 @@ const {
   SET_VAULT,
   SET_ACTIVE_CHARACTER,
 
-  SET_ITEM_INSTANCES,
+  ADD_ITEM_INSTANCES,
+  REMOVE_ITEM_INSTANCES,
   SET_CHARACTER_ITEM_IDS,
   SET_ACCOUNT_ITEM_IDS,
   SET_INSPECTED_ITEM_ID,
@@ -200,8 +201,12 @@ const mutations = {
     state.vault = vault;
   },
 
-  [SET_ITEM_INSTANCES]: function setItemInstances(state, itemInstances) {
-    state.itemInstances = itemInstances;
+  [ADD_ITEM_INSTANCES]: function addItemInstances(state, itemInstances) {
+    state.itemInstances = { ...state.itemInstances, ...itemInstances };
+  },
+  [REMOVE_ITEM_INSTANCES]: function removeItemInstances(state, itemIds) {
+    const { itemInstances } = state;
+    itemIds.forEach((id) => { itemInstances[id] = null; });
   },
   [SET_CHARACTER_ITEM_IDS]: function setCharacterItemIds(state, { owner, itemIds }) {
     Vue.set(state.characterItemIds, owner, itemIds);
@@ -410,7 +415,7 @@ const actions = {
       return ids;
     }));
 
-    commit(SET_ITEM_INSTANCES, itemInstances);
+    commit(ADD_ITEM_INSTANCES, itemInstances);
   },
 };
 
