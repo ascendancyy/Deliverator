@@ -122,10 +122,15 @@ Service.interceptors.request.use(async (config) => {
 
     let addSecurity = Boolean(endpoint.security);
     if (!addSecurity && _.find(operationQueries, { name: 'components' })) {
-      // eslint-disable-next-line no-bitwise
-      addSecurity |= _.get(queries, 'components', '')
-        .split(',')
-        .some(component => [102, 103, 201, 202, 204].includes(Number(component)));
+      const components = _.get(queries, 'components', '');
+      try {
+        // eslint-disable-next-line no-bitwise
+        addSecurity |= String(components)
+          .split(',')
+          .some(component => [102, 103, 201, 202, 204].includes(Number(component)));
+      } catch (e) {
+        console.warn('Invalid components passed.');
+      }
     }
 
     if (addSecurity) {
