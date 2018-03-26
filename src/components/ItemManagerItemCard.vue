@@ -291,7 +291,25 @@ export default {
     }, 32, { leading: true, trailing: true }));
   },
   methods: {
-    action() {
+    action(destinationId) {
+      if (!this.itemInstance) {
+        return;
+      }
+      const { owner, id, itemHash } = this.itemInstance;
+      if (owner !== destinationId) {
+        this.$store.dispatch('activeMembership/TRANSFER_ITEM', {
+          from: owner,
+          to: destinationId,
+          itemId: id,
+          itemReferenceHash: itemHash,
+          quantity: this.amount,
+        });
+      } else {
+        this.$store.dispatch('activeMembership/EQUIP_ITEM', {
+          characterId: destinationId,
+          itemId: id,
+        });
+      }
       this.hide();
     },
 
