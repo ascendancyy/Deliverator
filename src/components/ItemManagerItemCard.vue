@@ -212,7 +212,7 @@ export default {
       const { itemInstance, definition } = this;
       if (
         !definition ||
-        (definition && definition.nonTransferrable && !itemInstance.canEquip)
+        (definition && definition.nonTransferrable)
       ) {
         return [];
       }
@@ -238,7 +238,6 @@ export default {
         const isOwner = character.id === itemInstance.owner;
         if (
           this.itemEquipped ||
-          (isOwner && !itemInstance.canEquip) ||
           (!isOwner && (definition.nonTransferrable || itemInstance.transferStatus > 0))
         ) {
           return false;
@@ -291,7 +290,25 @@ export default {
     }, 32, { leading: true, trailing: true }));
   },
   methods: {
-    action() {
+    action(destinationId) {
+      if (!this.itemInstance) {
+        return;
+      }
+      const { owner, id, itemHash } = this.itemInstance;
+      if (owner !== destinationId) {
+        this.$store.dispatch('activeMembership/TRANSFER_ITEM', {
+          from: owner,
+          to: destinationId,
+          itemId: id,
+          itemReferenceHash: itemHash,
+          quantity: this.amount,
+        });
+      } else {
+        this.$store.dispatch('activeMembership/EQUIP_ITEM', {
+          characterId: destinationId,
+          itemId: id,
+        });
+      }
       this.hide();
     },
 

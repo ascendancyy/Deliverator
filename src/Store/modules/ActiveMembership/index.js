@@ -1,6 +1,9 @@
+/* eslint-disable no-bitwise */
+
 import _ from 'lodash';
 import Vue from 'vue';
 
+import Service from 'B.Net/Service';
 import Paths from 'B.Net/Paths';
 import Identifiers from 'B.Net/Identifiers';
 import Definitions from 'B.Net/Definitions';
@@ -9,6 +12,7 @@ import getViableProfile from 'B.Net/getViableProfile';
 import BucketMetadata from 'B.Net/metadata/BucketMetadata';
 
 import processCharacter from 'Store/modules/ActiveMembership/processCharacter';
+import handleTransfer from 'Store/modules/ActiveMembership/handleTransfer';
 
 import Storage from 'src/Storage';
 import { prefixURL } from 'src/utils';
@@ -24,7 +28,8 @@ const {
   SET_VAULT,
   SET_ACTIVE_CHARACTER,
 
-  SET_ITEM_INSTANCES,
+  ADD_ITEM_INSTANCES,
+  REMOVE_ITEM_INSTANCES,
   SET_CHARACTER_ITEM_IDS,
   SET_ACCOUNT_ITEM_IDS,
   SET_INSPECTED_ITEM_ID,
@@ -38,11 +43,17 @@ const {
 
   SET_DEFINITIONS,
 
+  ADD_ITEM_ID,
+  REMOVE_ITEM_ID,
+  UPDATE_ITEM,
+
   // actions
   GET_DEFINITIONS,
   FETCH_PROFILE,
   PROCESS_CHARACTERS,
   PROCESS_INVENTORY,
+  EQUIP_ITEM,
+  TRANSFER_ITEM,
 } = Types;
 
 const buckets = new Map();
@@ -200,8 +211,12 @@ const mutations = {
     state.vault = vault;
   },
 
-  [SET_ITEM_INSTANCES]: function setItemInstances(state, itemInstances) {
-    state.itemInstances = itemInstances;
+  [ADD_ITEM_INSTANCES]: function addItemInstances(state, itemInstances) {
+    state.itemInstances = { ...state.itemInstances, ...itemInstances };
+  },
+  [REMOVE_ITEM_INSTANCES]: function removeItemInstances(state, itemIds) {
+    const { itemInstances } = state;
+    itemIds.forEach((id) => { itemInstances[id] = null; });
   },
   [SET_CHARACTER_ITEM_IDS]: function setCharacterItemIds(state, { owner, itemIds }) {
     Vue.set(state.characterItemIds, owner, itemIds);
@@ -240,6 +255,46 @@ const mutations = {
 
   [SET_DEFINITIONS]: function setDefinitions(state, db) {
     state.definitions = db;
+  },
+
+  [ADD_ITEM_ID]: function addItemId(state, { itemId, owner }) {
+    const { characterItemIds, itemInstances } = state;
+    const item = itemInstances[itemId];
+    item.owner = owner;
+    switch (owner) {
+      case 'account': {
+        const { accountItemIds } = state;
+        accountItemIds.push(itemId);
+        break;
+      }
+      default: { characterItemIds[owner].push(itemId); }
+    }
+  },
+  [REMOVE_ITEM_ID]: function removeItemId(state, { itemId, owner }) {
+    const { characterItemIds, itemInstances } = state;
+    const item = itemInstances[itemId];
+    item.owner = null;
+    switch (owner) {
+      case 'account': {
+        const { accountItemIds } = state;
+        const index = accountItemIds.indexOf(itemId);
+        accountItemIds.splice(index, 1);
+        break;
+      }
+      default: {
+        const index = characterItemIds[owner].indexOf(itemId);
+        characterItemIds[owner].splice(index, 1);
+      }
+    }
+  },
+  [UPDATE_ITEM]: function updateItem(state, payload) {
+    const { itemId, prop, value } = payload;
+    const item = state.itemInstances[itemId];
+    if (Object.prototype.hasOwnProperty.call(item, prop)) {
+      Vue.set(item, prop, value);
+    } else if (process.env.NODE_ENV !== 'production') {
+      console.warn('Do not set new properties on items.');
+    }
   },
 };
 
@@ -288,6 +343,18 @@ const actions = {
       commit(SET_PLATFORM_TYPE, userInfo.membershipType);
     }
 
+    const {
+      displayProperties: {
+        name,
+        icon,
+      },
+    } = await (await definitions).Vendor[Identifiers.VAULT];
+    commit(SET_VAULT, {
+      id: Identifiers.VAULT,
+      name,
+      emblemPath: prefixURL(icon, Paths.BASE),
+    });
+
     return Promise.all([
       dispatch(PROCESS_CHARACTERS, { definitions: await definitions, characters }),
       dispatch(PROCESS_INVENTORY, {
@@ -301,18 +368,6 @@ const actions = {
     ]);
   },
   [PROCESS_CHARACTERS]: async function processCharacters({ commit }, { characters, definitions }) {
-    const {
-      displayProperties: {
-        name,
-        icon,
-      },
-    } = await definitions.Vendor[Identifiers.VAULT];
-    commit(SET_VAULT, {
-      id: Identifiers.VAULT,
-      name,
-      emblemPath: prefixURL(icon, Paths.BASE),
-    });
-
     const processor = async character => processCharacter({
       definitions,
       character,
@@ -365,7 +420,6 @@ const actions = {
         id,
         owner,
         bucket: bucketDef,
-        currentBucket: await definitions.InventoryBucket[item.bucketHash],
       };
 
       return id;
@@ -410,7 +464,120 @@ const actions = {
       return ids;
     }));
 
-    commit(SET_ITEM_INSTANCES, itemInstances);
+    commit(ADD_ITEM_INSTANCES, itemInstances);
+  },
+
+  [EQUIP_ITEM]: async function equipItem(context, { characterId, itemId }) {
+    const { state, commit, dispatch } = context;
+    const {
+      id: stateId,
+      platformType,
+      characterItemIds,
+      itemInstances,
+      definitions,
+    } = state;
+    const instance = itemInstances[itemId];
+    if (!instance) {
+      console.warn('Invalid Id / Missing item instance');
+      return;
+    }
+
+    const { transferStatus, bucket } = instance;
+    if (transferStatus & 1) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Item already equipped');
+      }
+      return;
+    }
+
+    try {
+      await Service.request({
+        method: 'POST',
+        operationId: 'Destiny2.EquipItem',
+        data: {
+          characterId,
+          itemId,
+          membershipType: platformType,
+        },
+      });
+    } catch (e) {
+      console.warn(e);
+      return;
+    }
+
+    const currentEquipped = characterItemIds[characterId]
+      .map(id => itemInstances[id])
+      .filter(Boolean)
+      .find(item => bucket.hash === item.bucket.hash && item.transferStatus & 1);
+
+    commit(UPDATE_ITEM, {
+      itemId: currentEquipped.id,
+      prop: 'transferStatus',
+      value: currentEquipped.transferStatus & 2,
+    });
+    commit(UPDATE_ITEM, {
+      itemId: instance.id,
+      prop: 'transferStatus',
+      value: instance.transferStatus ^ 1,
+    });
+
+    let character;
+    try {
+      ({ character: { data: character } } = await Service.request({
+        operationId: 'Destiny2.GetCharacter',
+        operationParams: {
+          characterId,
+          destinyMembershipId: stateId,
+          membershipType: platformType,
+          components: 200,
+        },
+      }));
+    } catch (e) {
+      console.warn(e);
+    }
+    if (character) {
+      dispatch(PROCESS_CHARACTERS, {
+        definitions: await definitions,
+        characters: { [characterId]: character },
+      });
+    }
+  },
+  [TRANSFER_ITEM]: async function transferItem(context, payload) {
+    const { state: { activeCharacterId } } = context;
+    const {
+      from,
+      to,
+      itemId,
+      itemReferenceHash,
+      quantity,
+    } = payload;
+    const transferToVault = Identifiers.VAULT === to;
+    const desinationId = transferToVault ? from : to;
+
+    try {
+      await Service.request({
+        method: 'POST',
+        operationId: 'Destiny2.TransferItem',
+        data: {
+          characterId: desinationId === 'account' ? activeCharacterId : desinationId,
+          itemId: itemId.startsWith('item_') ? 0 : itemId,
+          itemReferenceHash,
+          membershipType: state.platformType,
+          stackSize: quantity,
+          transferToVault,
+        },
+      });
+    } catch (e) {
+      console.warn(e);
+      return;
+    }
+
+    await handleTransfer(context, {
+      from,
+      to,
+      itemId,
+      quantity,
+    });
   },
 };
 
