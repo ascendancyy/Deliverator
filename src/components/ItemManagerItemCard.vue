@@ -212,7 +212,7 @@ export default {
       const { itemInstance, definition } = this;
       if (
         !definition ||
-        (definition && definition.nonTransferrable && !itemInstance.canEquip)
+        (definition && definition.nonTransferrable)
       ) {
         return [];
       }
@@ -238,7 +238,6 @@ export default {
         const isOwner = character.id === itemInstance.owner;
         if (
           this.itemEquipped ||
-          (isOwner && !itemInstance.canEquip) ||
           (!isOwner && (definition.nonTransferrable || itemInstance.transferStatus > 0))
         ) {
           return false;
